@@ -35,8 +35,8 @@ st.markdown("""
 
 @st.cache_data
 def load_and_clean():
-    raw_survey = pd.read_csv("04652-0001-Data.tsv", sep='\t')
-    raw_bio = pd.read_csv("29282-0001-Data.tsv", sep='\t')
+raw_survey = pd.read_csv("survey_filtered.csv")
+raw_bio = pd.read_csv("29282-0001-Data.tsv", sep='\t')
     
     cols = ['M2ID', 'B1PB19', 'B1PA1', 'B1PA15', 'B1PA2', 'B1PRSEX', 'B1PAGE_M2', 'B1PB1']
     df_s = raw_survey[cols].copy()
