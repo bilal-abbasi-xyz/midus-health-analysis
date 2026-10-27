@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 
+
+# The website is available at: https://midus-health-analysis.streamlit.app
 # Page Configuration
 st.set_page_config(page_title="Midlife Marital Status & Health", layout="wide")
 
@@ -33,7 +35,7 @@ st.markdown("""
 
 @st.cache_data
 def load_and_clean():
-    raw_survey = pd.read_csv("survey_filtered.csv")
+    raw_survey = pd.read_csv("04652-0001-Data.tsv", sep='\t')
     raw_bio = pd.read_csv("29282-0001-Data.tsv", sep='\t')
     
     cols = ['M2ID', 'B1PB19', 'B1PA1', 'B1PA15', 'B1PA2', 'B1PRSEX', 'B1PAGE_M2', 'B1PB1']
@@ -107,15 +109,24 @@ ax1a.set_ylabel("Mean Score")
 ax1a.set_ylim(1, 5)
 st.pyplot(fig1a)
 
-m_phys = clean_df[clean_df['marital_status']=='Married']['phys_health'].mean()
-d_phys = clean_df[clean_df['marital_status']=='Divorced']['phys_health'].mean()
-t_stat_phys, p_val_phys = stats.ttest_ind(clean_df[clean_df['marital_status']=='Married']['phys_health'].dropna(),
-                                          clean_df[clean_df['marital_status']=='Divorced']['phys_health'].dropna())
+# Statistical Calculations across ALL Marital Statuses vs Married Baseline
+categories = ['Married', 'Divorced', 'Separated', 'Widowed', 'Never Married']
+phys_stats = clean_df.groupby('marital_status')['phys_health'].agg(['mean', 'std', 'var'])
+m_phys_data = clean_df[clean_df['marital_status'] == 'Married']['phys_health'].dropna()
 
-st.markdown(f"""
-* **Married Mean:** `{m_phys:.2f}` | **Divorced Mean:** `{d_phys:.2f}` (Diff: `{(m_phys - d_phys):.2f}`)
-* **t-Test (Married vs Divorced):** $t = {t_stat_phys:.3f}$, $p = {p_val_phys:.5f}$ (Statistically significant deficit).
-""")
+st.markdown("#### Comprehensive Group Statistics & Hypothesis Tests (vs Married)")
+for cat in categories:
+    mean_val = phys_stats.loc[cat, 'mean']
+    std_val = phys_stats.loc[cat, 'std']
+    var_val = phys_stats.loc[cat, 'var']
+    
+    if cat == 'Married':
+        st.markdown(f"* **{cat}:** Mean = `{mean_val:.3f}`, SD = `{std_val:.3f}`, Var = `{var_val:.3f}` (Baseline)")
+    else:
+        cat_data = clean_df[clean_df['marital_status'] == cat]['phys_health'].dropna()
+        t_stat, p_val = stats.ttest_ind(m_phys_data, cat_data)
+        w_stat, lev_p = stats.levene(m_phys_data, cat_data)
+        st.markdown(f"* **{cat}:** Mean = `{mean_val:.3f}`, SD = `{std_val:.3f}`, Var = `{var_val:.3f}` | **t-test vs Married:** t = `{t_stat:.3f}`, p = `{p_val:.5f}` | **Levene:** W = `{w_stat:.3f}`, p = `{lev_p:.5f}`")
 
 st.divider()
 
@@ -127,15 +138,22 @@ ax1b.set_xlabel("Marital Status")
 ax1b.set_ylabel("Condition Count")
 st.pyplot(fig1b)
 
-m_var_chr = clean_df[clean_df['marital_status']=='Married']['chronic_count'].var()
-d_var_chr = clean_df[clean_df['marital_status']=='Divorced']['chronic_count'].var()
-lev_stat, lev_pval = stats.levene(clean_df[clean_df['marital_status']=='Married']['chronic_count'].dropna(),
-                                   clean_df[clean_df['marital_status']=='Divorced']['chronic_count'].dropna())
+chr_stats = clean_df.groupby('marital_status')['chronic_count'].agg(['mean', 'std', 'var'])
+m_chr_data = clean_df[clean_df['marital_status'] == 'Married']['chronic_count'].dropna()
 
-st.markdown(f"""
-* **Married Variance:** `{m_var_chr:.3f}` | **Divorced Variance:** `{d_var_chr:.3f}` (`{((d_var_chr - m_var_chr)/m_var_chr * 100):.1f}%` higher variance)
-* **Levene Variance Test:** $W = {lev_stat:.3f}$, $p = {lev_pval:.4e}$ (Significantly higher health outcome dispersion post-divorce).
-""")
+st.markdown("#### Comprehensive Group Statistics & Hypothesis Tests (vs Married)")
+for cat in categories:
+    mean_val = chr_stats.loc[cat, 'mean']
+    std_val = chr_stats.loc[cat, 'std']
+    var_val = chr_stats.loc[cat, 'var']
+    
+    if cat == 'Married':
+        st.markdown(f"* **{cat}:** Mean = `{mean_val:.3f}`, SD = `{std_val:.3f}`, Var = `{var_val:.3f}` (Baseline)")
+    else:
+        cat_data = clean_df[clean_df['marital_status'] == cat]['chronic_count'].dropna()
+        t_stat, p_val = stats.ttest_ind(m_chr_data, cat_data)
+        w_stat, lev_p = stats.levene(m_chr_data, cat_data)
+        st.markdown(f"* **{cat}:** Mean = `{mean_val:.3f}`, SD = `{std_val:.3f}`, Var = `{var_val:.3f}` | **t-test vs Married:** t = `{t_stat:.3f}`, p = `{p_val:.5f}` | **Levene:** W = `{w_stat:.3f}`, p = `{lev_p:.5e}`")
 
 st.divider()
 
@@ -147,15 +165,22 @@ ax2.set_xlabel("Marital Status")
 ax2.set_ylabel("Fibrinogen (mg/dL)")
 st.pyplot(fig2)
 
-m_fib = merged_df[merged_df['marital_status']=='Married']['B4BFGN'].mean()
-s_fib = merged_df[merged_df['marital_status']=='Separated']['B4BFGN'].mean()
-t_fib, p_fib = stats.ttest_ind(merged_df[merged_df['marital_status']=='Married']['B4BFGN'].dropna(),
-                               merged_df[merged_df['marital_status']=='Separated']['B4BFGN'].dropna())
+fib_stats = merged_df.groupby('marital_status')['B4BFGN'].agg(['mean', 'std', 'var'])
+m_fib_data = merged_df[merged_df['marital_status'] == 'Married']['B4BFGN'].dropna()
 
-st.markdown(f"""
-* **Married Mean:** `{m_fib:.2f} mg/dL` | **Separated Mean:** `{s_fib:.2f} mg/dL` (Spike: `+{(s_fib - m_fib):.2f} mg/dL` / +17.4%)
-* **t-Test (Married vs Separated):** $t = {t_fib:.3f}$, $p = {p_fib:.4f}$ (Significant biological inflammation spike).
-""")
+st.markdown("#### Comprehensive Group Statistics & Hypothesis Tests (vs Married)")
+for cat in categories:
+    mean_val = fib_stats.loc[cat, 'mean']
+    std_val = fib_stats.loc[cat, 'std']
+    var_val = fib_stats.loc[cat, 'var']
+    
+    if cat == 'Married':
+        st.markdown(f"* **{cat}:** Mean = `{mean_val:.3f} mg/dL`, SD = `{std_val:.3f}`, Var = `{var_val:.3f}` (Baseline)")
+    else:
+        cat_data = merged_df[merged_df['marital_status'] == cat]['B4BFGN'].dropna()
+        t_stat, p_val = stats.ttest_ind(m_fib_data, cat_data)
+        w_stat, lev_p = stats.levene(m_fib_data, cat_data)
+        st.markdown(f"* **{cat}:** Mean = `{mean_val:.3f} mg/dL`, SD = `{std_val:.3f}`, Var = `{var_val:.3f}` | **t-test vs Married:** t = `{t_stat:.3f}`, p = `{p_val:.5f}` | **Levene:** W = `{w_stat:.3f}`, p = `{lev_p:.5f}`")
 
 st.divider()
 
@@ -168,15 +193,24 @@ ax3.set_ylabel("Mental Health Score (1-5)")
 ax3.set_ylim(1, 5)
 st.pyplot(fig3)
 
-m_fem_mh = clean_df[(clean_df['marital_status']=='Married') & (clean_df['gender']=='Female')]['mental_health'].mean()
-d_fem_mh = clean_df[(clean_df['marital_status']=='Divorced') & (clean_df['gender']=='Female')]['mental_health'].mean()
-m_male_mh = clean_df[(clean_df['marital_status']=='Married') & (clean_df['gender']=='Male')]['mental_health'].mean()
-d_male_mh = clean_df[(clean_df['marital_status']=='Divorced') & (clean_df['gender']=='Male')]['mental_health'].mean()
+mh_stats = clean_df.groupby(['marital_status', 'gender'])['mental_health'].agg(['mean', 'std', 'var'])
 
-st.markdown(f"""
-* **Married vs Divorced Males:** `{m_male_mh:.2f}` vs `{d_male_mh:.2f}` (Diff: `{(d_male_mh - m_male_mh):.2f}`)
-* **Married vs Divorced Females:** `{m_fem_mh:.2f}` vs `{d_fem_mh:.2f}` (Diff: `{(d_fem_mh - m_fem_mh):.2f}`)
-""")
+st.markdown("#### Comprehensive Group Statistics & Hypothesis Tests by Gender (vs Married Baseline)")
+for gender in ['Male', 'Female']:
+    st.markdown(f"**--- {gender} Subgroup Analysis ---**")
+    m_mh_gender = clean_df[(clean_df['marital_status'] == 'Married') & (clean_df['gender'] == gender)]['mental_health'].dropna()
+    for cat in categories:
+        mean_val = mh_stats.loc[(cat, gender), 'mean']
+        std_val = mh_stats.loc[(cat, gender), 'std']
+        var_val = mh_stats.loc[(cat, gender), 'var']
+        
+        if cat == 'Married':
+            st.markdown(f"* **{cat} ({gender}):** Mean = `{mean_val:.3f}`, SD = `{std_val:.3f}`, Var = `{var_val:.3f}` (Baseline)")
+        else:
+            cat_gender_data = clean_df[(clean_df['marital_status'] == cat) & (clean_df['gender'] == gender)]['mental_health'].dropna()
+            t_stat, p_val = stats.ttest_ind(m_mh_gender, cat_gender_data)
+            w_stat, lev_p = stats.levene(m_mh_gender, cat_gender_data)
+            st.markdown(f"* **{cat} ({gender}):** Mean = `{mean_val:.3f}`, SD = `{std_val:.3f}`, Var = `{var_val:.3f}` | **t-test vs Married:** t = `{t_stat:.3f}`, p = `{p_val:.5f}` | **Levene:** W = `{w_stat:.3f}`, p = `{lev_p:.5f}`")
 
 st.divider()
 
